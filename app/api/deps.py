@@ -16,12 +16,10 @@ async def get_current_user(request: Request):
       2) Если нет - в cookie (ACCESS_COOKIE_NAME)
     Если что-то не так - кидаем 401."""
 
-    # Пробуем взять из заголовка
     auth = request.headers.get("Authorization", "")
     prefix = "Bearer "
     token = auth[len(prefix):].strip() if auth.startswith(prefix) else None
 
-    # Если в заголовке пусто — пробуем cookie
     if not token:
         token = request.cookies.get(settings.ACCESS_COOKIE_NAME)
 

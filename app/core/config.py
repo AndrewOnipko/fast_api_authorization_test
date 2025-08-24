@@ -14,7 +14,6 @@ class Settings(BaseModel):
     CORS_ALLOW_ORIGINS: list[str] = [o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173").split(",")]
     ALLOWED_HOSTS: list[str] = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")]
 
-    # Cookies
     ACCESS_COOKIE_NAME: str = os.getenv("ACCESS_COOKIE_NAME", "access_token")
     REFRESH_COOKIE_NAME: str = os.getenv("REFRESH_COOKIE_NAME", "refresh_token")
     COOKIE_DOMAIN: str | None = os.getenv("COOKIE_DOMAIN")  

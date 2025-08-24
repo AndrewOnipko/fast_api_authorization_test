@@ -27,19 +27,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Auth Service", version="1.1.0", lifespan=lifespan)
 
-# CORS: разрешаем только whitelisted origins, включаем credentials (cookies)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
-)
+    )
 
-# защита от подмены Host
+
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
-# --- Middleware -------------------------
 
 @app.middleware("http")
 async def add_request_id_and_access_log(request: Request, call_next):
@@ -54,10 +52,8 @@ async def add_request_id_and_access_log(request: Request, call_next):
     try:
         response = await call_next(request)
     except HTTPException:
-        # "Ожидаемые" HTTP ошибки отдаст хендлер ниже (и залогирует)
         raise
     except Exception:
-        # Любая непродуманная ошибка - аккуратный 500 и лог с request_id
         log.exception(
             "unhandled exception",
             extra={"request_id": request_id, "method": request.method, "path": request.url.path}
@@ -68,7 +64,6 @@ async def add_request_id_and_access_log(request: Request, call_next):
             )
 
     dur_ms = int((time.perf_counter() - start) * 1000)
-    # Простой access-лог (есть статус и длительность)
     log.info(
         "request done",
         extra={
@@ -82,7 +77,6 @@ async def add_request_id_and_access_log(request: Request, call_next):
     response.headers["X-Request-ID"] = request_id
     return response
 
-# --- Доп: Origin allowlist поверх CORS --------------------------------
 
 @app.middleware("http")
 async def enforce_origin_allowlist(request: Request, call_next):
@@ -93,7 +87,6 @@ async def enforce_origin_allowlist(request: Request, call_next):
         return JSONResponse({"detail": "Origin not allowed"}, status_code=403)
     return await call_next(request)
 
-# --- Централизованные обработчики ошибок ----------------------------------------
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -130,7 +123,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         )
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
-# --- Роутеры ---------------------------------------------------------------------
 
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(users_router, prefix="/users", tags=["users"])

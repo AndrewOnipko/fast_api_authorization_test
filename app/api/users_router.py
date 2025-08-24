@@ -32,7 +32,6 @@ async def update_password(request: Request, response: Response, body: UpdatePass
       - отзывает все refresh токены пользователя (logout во всех сессиях)
       - очищает cookies в ответе"""
     
-    # 1) Проверяем, что меняем свой пароль (без админ-режима, чтобы не усложнять)
     if body.email != user["email"]:
         log.warning("update_password forbidden email_mismatch body=%s user=%s", body.email, user["email"])
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email is not your own")
@@ -44,23 +43,18 @@ async def update_password(request: Request, response: Response, body: UpdatePass
         log.warning("update_password user_not_found email=%s", body.email)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    # 2) Проверяем текущий пароль
     if not verify_password(body.current_password, target["password_hash"]):
         log.warning("update_password wrong_current_password email=%s", body.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is wrong")
 
-    # 3) Обновляем пароль
     new_hash = hash_password(body.new_password)
     ok = await users_repo.update_password_by_id(user_id=target["id"], new_password_hash=new_hash)
     if not ok:
-        # маловероятно, но на всякий случай
         log.warning("update_password failed_to_update user_id=%s", str(target["id"]))
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update password")
 
-    # 4) Отзываем все refresh токены пользователя (logout отовсюду)
     await RefreshTokensRepo(pool).revoke_all_for_user(user_id=target["id"], reason="password_change")
 
-    # 5) Чистим cookies, чтобы разлогинить в текущем клиенте
     _clear_auth_cookies(response)
 
     log.info("update_password ok user_id=%s email=%s", str(target["id"]), target["email"])
@@ -74,7 +68,6 @@ async def delete_me(request: Request, response: Response, user = Depends(get_cur
     pool = get_pool(request.app)
     users_repo = UsersRepo(pool)
 
-    # Отзовём все refresh до удаления
     await RefreshTokensRepo(pool).revoke_all_for_user(user_id=user["id"], reason="user_delete")
 
     deleted = await users_repo.delete_by_email(user["email"])
@@ -86,7 +79,6 @@ async def delete_me(request: Request, response: Response, user = Depends(get_cur
     log.info("delete ok email=%s", user["email"])
     return {"detail": "ok"}
 
-# --- Хелпер для чистки auth cookies (скопировано из auth_router, чтобы не импортить приватную функцию) 
 
 def _clear_auth_cookies(resp: Response) -> None:
     """Удаляет обе auth cookies (access/refresh).
